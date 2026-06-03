@@ -18,7 +18,7 @@ set_env() {
     KEY=$1
     VALUE=$2
     grep -v "^${KEY}=" .env > /tmp/.env.tmp && mv /tmp/.env.tmp .env
-    echo "${KEY}=\"${VALUE}\"" >> .env
+    echo "${KEY}=${VALUE}" >> .env
 }
 
 [ -n "$APP_NAME" ]         && set_env APP_NAME         "$APP_NAME"
