@@ -13,15 +13,12 @@ if [ ! -f .env ]; then
     fi
 fi
 
-# ── 2. Inject Coolify env vars into .env (quoted to handle spaces) ─────────
+# ── 2. Inject Coolify env vars into .env ──────────────────────────────────
 set_env() {
     KEY=$1
     VALUE=$2
-    if grep -q "^${KEY}=" .env; then
-        sed -i "s|^${KEY}=.*|${KEY}=\"${VALUE}\"|" .env
-    else
-        echo "${KEY}=\"${VALUE}\"" >> .env
-    fi
+    grep -v "^${KEY}=" .env > /tmp/.env.tmp && mv /tmp/.env.tmp .env
+    echo "${KEY}=\"${VALUE}\"" >> .env
 }
 
 [ -n "$APP_NAME" ]         && set_env APP_NAME         "$APP_NAME"
@@ -37,28 +34,42 @@ set_env() {
 [ -n "$CACHE_DRIVER" ]     && set_env CACHE_DRIVER      "$CACHE_DRIVER"
 [ -n "$QUEUE_CONNECTION" ] && set_env QUEUE_CONNECTION  "$QUEUE_CONNECTION"
 
-# ── 3. Generate APP_KEY and inject it ─────────────────────────────────────
+# ── 3. Generate APP_KEY using artisan ─────────────────────────────────────
 grep -q "^APP_KEY=" .env || echo "APP_KEY=" >> .env
-APP_KEY_VALUE=$(php -r "echo 'base64:' . base64_encode(random_bytes(32));")
-sed -i "s|^APP_KEY=.*|APP_KEY=${APP_KEY_VALUE}|" .env
-echo "APP_KEY set."
+php artisan key:generate --force --no-interaction
+echo "APP_KEY value:"
+grep "^APP_KEY=" .env
 
 # ── 4. Fix permissions ────────────────────────────────────────────────────
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 
-# ── 5. Storage symlink — skip if already exists ───────────────────────────
+# ── 4b. Create required app directories ──────────────────────────────────
+for DIR in custom_views public/uploads public/uploads/product public/uploads/brand; do
+    if [ ! -d "$DIR" ]; then
+        mkdir -p "$DIR"
+        echo "Created missing directory: $DIR"
+    fi
+done
+chown -R www-data:www-data custom_views public/uploads
+chmod -R 775 custom_views public/uploads
+
+# ── 5. Storage symlink ────────────────────────────────────────────────────
 if [ ! -L public/storage ]; then
     php artisan storage:link --no-interaction
 else
     echo "Storage link already exists, skipping."
 fi
 
-# ── 6. Clear stale caches ─────────────────────────────────────────────────
-php artisan config:clear
-php artisan route:clear
-php artisan view:clear
-php artisan cache:clear
+# ── 6. Nuke ALL stale bootstrap caches ───────────────────────────────────
+rm -f bootstrap/cache/config.php
+rm -f bootstrap/cache/routes-v7.php
+rm -f bootstrap/cache/services.php
+rm -f bootstrap/cache/packages.php
+php artisan config:clear 2>/dev/null || true
+php artisan route:clear  2>/dev/null || true
+php artisan view:clear   2>/dev/null || true
+php artisan cache:clear  2>/dev/null || true
 
 # ── 7. Wait for DB then migrate ───────────────────────────────────────────
 echo "Waiting for database..."
@@ -68,9 +79,10 @@ for i in $(seq 1 30); do
     sleep 2
 done
 
-# ── 8. Rebuild caches (skip route:cache — duplicate route names in app) ───
+# ── 8. Rebuild caches ─────────────────────────────────────────────────────
 php artisan config:cache
 php artisan view:cache
+# route:cache intentionally skipped — duplicate route names in this app
 
-# ── 9. Start services ────────────────────────────────────────────────────
+# ── 9. Start services ─────────────────────────────────────────────────────
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
