@@ -50,6 +50,12 @@ RUN mkdir -p \
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
+# Delete any bootstrap cache baked in during composer install
+RUN rm -f bootstrap/cache/config.php \
+          bootstrap/cache/routes-v7.php \
+          bootstrap/cache/services.php \
+          bootstrap/cache/packages.php
+
 # Install & build JS assets
 RUN npm install && npm run build || true
 
