@@ -21,9 +21,10 @@ set_env() {
     echo "${KEY}=${VALUE}" >> .env
 }
 
-[ -n "$APP_NAME" ]         && set_env APP_NAME         "$APP_NAME"
+[ -n "$APP_NAME" ]         && set_env APP_NAME          "$APP_NAME"
 [ -n "$APP_ENV" ]          && set_env APP_ENV           "$APP_ENV"
-[ -n "$APP_DEBUG" ]        && set_env APP_DEBUG         "$APP_DEBUG"
+[ -n "$APP_DEBUG"]         && set_env APP_DEBUG         "$APP_DEBUG"
+[ -n "$APP_KEY" ]          && set_env APP_KEY           "$APP_KEY"
 [ -n "$APP_URL" ]          && set_env APP_URL           "$APP_URL"
 [ -n "$DB_HOST" ]          && set_env DB_HOST           "$DB_HOST"
 [ -n "$DB_PORT" ]          && set_env DB_PORT           "$DB_PORT"
