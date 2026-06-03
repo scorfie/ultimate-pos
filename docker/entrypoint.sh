@@ -37,10 +37,10 @@ set_env() {
 [ -n "$CACHE_DRIVER" ]     && set_env CACHE_DRIVER      "$CACHE_DRIVER"
 [ -n "$QUEUE_CONNECTION" ] && set_env QUEUE_CONNECTION  "$QUEUE_CONNECTION"
 
-# ── 3. Generate APP_KEY and inject it (quoted) ────────────────────────────
+# ── 3. Generate APP_KEY and inject it ─────────────────────────────────────
 grep -q "^APP_KEY=" .env || echo "APP_KEY=" >> .env
 APP_KEY_VALUE=$(php -r "echo 'base64:' . base64_encode(random_bytes(32));")
-sed -i "s|^APP_KEY=.*|APP_KEY=\"${APP_KEY_VALUE}\"|" .env
+sed -i "s|^APP_KEY=.*|APP_KEY=${APP_KEY_VALUE}|" .env
 echo "APP_KEY set."
 
 # ── 4. Fix permissions ────────────────────────────────────────────────────
