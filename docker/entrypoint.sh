@@ -13,14 +13,14 @@ if [ ! -f .env ]; then
     fi
 fi
 
-# ── 2. Inject Coolify env vars into .env ──────────────────────────────────
+# ── 2. Inject Coolify env vars into .env (quoted to handle spaces) ─────────
 set_env() {
     KEY=$1
     VALUE=$2
     if grep -q "^${KEY}=" .env; then
-        sed -i "s|^${KEY}=.*|${KEY}=${VALUE}|" .env
+        sed -i "s|^${KEY}=.*|${KEY}=\"${VALUE}\"|" .env
     else
-        echo "${KEY}=${VALUE}" >> .env
+        echo "${KEY}=\"${VALUE}\"" >> .env
     fi
 }
 
@@ -37,14 +37,10 @@ set_env() {
 [ -n "$CACHE_DRIVER" ]     && set_env CACHE_DRIVER      "$CACHE_DRIVER"
 [ -n "$QUEUE_CONNECTION" ] && set_env QUEUE_CONNECTION  "$QUEUE_CONNECTION"
 
-# ── 3. Generate APP_KEY and write it directly into .env ───────────────────
-# Do NOT use artisan key:generate yet — .env must have the key line present
-# Ensure APP_KEY line exists first (even if blank)
+# ── 3. Generate APP_KEY and inject it (quoted) ────────────────────────────
 grep -q "^APP_KEY=" .env || echo "APP_KEY=" >> .env
-
-# Generate the key manually and inject it
 APP_KEY_VALUE=$(php -r "echo 'base64:' . base64_encode(random_bytes(32));")
-sed -i "s|^APP_KEY=.*|APP_KEY=${APP_KEY_VALUE}|" .env
+sed -i "s|^APP_KEY=.*|APP_KEY=\"${APP_KEY_VALUE}\"|" .env
 echo "APP_KEY set."
 
 # ── 4. Fix permissions ────────────────────────────────────────────────────
@@ -58,13 +54,13 @@ else
     echo "Storage link already exists, skipping."
 fi
 
-# ── 6. Clear stale caches before anything else ───────────────────────────
+# ── 6. Clear stale caches ─────────────────────────────────────────────────
 php artisan config:clear
 php artisan route:clear
 php artisan view:clear
 php artisan cache:clear
 
-# ── 7. Wait for DB, then migrate ─────────────────────────────────────────
+# ── 7. Wait for DB then migrate ───────────────────────────────────────────
 echo "Waiting for database..."
 for i in $(seq 1 30); do
     php artisan migrate --force --no-interaction && break
@@ -72,12 +68,8 @@ for i in $(seq 1 30); do
     sleep 2
 done
 
-# ── 8. Rebuild caches ────────────────────────────────────────────────────
+# ── 8. Rebuild caches (skip route:cache — duplicate route names in app) ───
 php artisan config:cache
-
-# Skip route:cache — this app has duplicate route names which breaks it
-# php artisan route:cache
-
 php artisan view:cache
 
 # ── 9. Start services ────────────────────────────────────────────────────
