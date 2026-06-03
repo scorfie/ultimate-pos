@@ -34,49 +34,59 @@ set_env() {
 [ -n "$CACHE_DRIVER" ]     && set_env CACHE_DRIVER      "$CACHE_DRIVER"
 [ -n "$QUEUE_CONNECTION" ] && set_env QUEUE_CONNECTION  "$QUEUE_CONNECTION"
 
-# ── 3. Fix permissions ────────────────────────────────────────────────────
+# ── 3. Nuke bootstrap cache FIRST before any artisan command ──────────────
+rm -f bootstrap/cache/config.php
+rm -f bootstrap/cache/routes-v7.php
+rm -f bootstrap/cache/services.php
+rm -f bootstrap/cache/packages.php
+echo "Bootstrap cache cleared."
+
+# ── 4. Generate APP_KEY ───────────────────────────────────────────────────
+grep -v "^APP_KEY=" .env > /tmp/.env.tmp && mv /tmp/.env.tmp .env
+echo "APP_KEY=" >> .env
+php artisan key:generate --force --no-interaction
+echo "APP_KEY result:"
+grep "^APP_KEY=" .env
+
+# ── 5. Fix permissions ────────────────────────────────────────────────────
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 
-# ── 4. Create required app directories ──────────────────────────────────
+# ── 6. Create required app directories ───────────────────────────────────
 for DIR in custom_views public/uploads public/uploads/product public/uploads/brand; do
     if [ ! -d "$DIR" ]; then
         mkdir -p "$DIR"
-        echo "Created missing directory: $DIR"
+        echo "Created: $DIR"
     fi
 done
 chown -R www-data:www-data custom_views public/uploads
 chmod -R 775 custom_views public/uploads
 
-# ── 5. Storage symlink ────────────────────────────────────────────────────
+# ── 7. Storage symlink ────────────────────────────────────────────────────
 if [ ! -L public/storage ]; then
     php artisan storage:link --no-interaction
 else
     echo "Storage link already exists, skipping."
 fi
 
-# ── 6. Nuke ALL stale bootstrap caches ───────────────────────────────────
-rm -f bootstrap/cache/config.php
-rm -f bootstrap/cache/routes-v7.php
-rm -f bootstrap/cache/services.php
-rm -f bootstrap/cache/packages.php
-php artisan config:clear 2>/dev/null || true
-php artisan route:clear  2>/dev/null || true
-php artisan view:clear   2>/dev/null || true
-php artisan cache:clear  2>/dev/null || true
+# ── 8. Clear all caches (no config:cache — avoids timing race with nginx) ─
+php artisan config:clear
+php artisan route:clear
+php artisan view:clear
+php artisan cache:clear
 
-# ── 7. Wait for DB then migrate ───────────────────────────────────────────
+# ── 9. Wait for DB then migrate ───────────────────────────────────────────
 echo "Waiting for database..."
 for i in $(seq 1 30); do
     php artisan migrate --force --no-interaction && break
-    echo "  DB not ready yet ($i/30), retrying in 2s..."
+    echo "  DB not ready ($i/30), retrying in 2s..."
     sleep 2
 done
 
-# ── 8. Rebuild caches ─────────────────────────────────────────────────────
-php artisan config:cache
+# ── 10. view:cache only (safe — no key dependency) ───────────────────────
 php artisan view:cache
-# route:cache intentionally skipped — duplicate route names in this app
+# config:cache  → SKIPPED (causes blank key race condition)
+# route:cache   → SKIPPED (duplicate route names in this app)
 
-# ── 9. Start services ─────────────────────────────────────────────────────
+# ── 11. Start services ────────────────────────────────────────────────────
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf
