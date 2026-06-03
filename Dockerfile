@@ -34,6 +34,19 @@ WORKDIR /var/www/html
 # Copy app files
 COPY . .
 
+# Create directories required by Ultimate POS
+RUN mkdir -p \
+    /var/www/html/custom_views \
+    /var/www/html/public/uploads \
+    /var/www/html/public/uploads/product \
+    /var/www/html/public/uploads/brand \
+    && chown -R www-data:www-data \
+        /var/www/html/custom_views \
+        /var/www/html/public/uploads \
+    && chmod -R 775 \
+        /var/www/html/custom_views \
+        /var/www/html/public/uploads
+
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
