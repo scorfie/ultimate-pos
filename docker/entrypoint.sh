@@ -34,19 +34,11 @@ set_env() {
 [ -n "$CACHE_DRIVER" ]     && set_env CACHE_DRIVER      "$CACHE_DRIVER"
 [ -n "$QUEUE_CONNECTION" ] && set_env QUEUE_CONNECTION  "$QUEUE_CONNECTION"
 
-# ── 3. Generate APP_KEY ───────────────────────────────────────────────────
-# Strip ALL existing APP_KEY lines, write one blank, then let artisan fill it
-grep -v "^APP_KEY=" .env > /tmp/.env.tmp && mv /tmp/.env.tmp .env
-echo "APP_KEY=" >> .env
-php artisan key:generate --force --no-interaction
-echo "APP_KEY written:"
-grep "^APP_KEY=" .env
-
-# ── 4. Fix permissions ────────────────────────────────────────────────────
+# ── 3. Fix permissions ────────────────────────────────────────────────────
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 
-# ── 4b. Create required app directories ──────────────────────────────────
+# ── 4. Create required app directories ──────────────────────────────────
 for DIR in custom_views public/uploads public/uploads/product public/uploads/brand; do
     if [ ! -d "$DIR" ]; then
         mkdir -p "$DIR"
